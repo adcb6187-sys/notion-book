@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>도서 검색 → 노션</title>
+<style>
+  :root { --bg:#fff; --fg:#2b2b2b; --muted:#8a8a8a; --line:#e6e6e6; --accent:#2f6fed; --ok:#1a9b5a; --err:#d64545; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#191919; --fg:#e8e8e8; --muted:#9a9a9a; --line:#333; --accent:#5b8dff; --ok:#4cc38a; --err:#ff7b7b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:12px; background:var(--bg); color:var(--fg);
+         font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; font-size:14px; }
+  form { display:flex; gap:8px; margin-bottom:12px; }
+  input { flex:1; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+          background:transparent; color:var(--fg); font-size:14px; }
+  button { padding:10px 14px; border:0; border-radius:8px; background:var(--accent);
+           color:#fff; font-size:14px; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .item img { width:56px; height:80px; object-fit:cover; border-radius:4px; background:var(--line); flex:none; }
+  .info { flex:1; min-width:0; }
+  .t { font-weight:600; margin-bottom:2px; }
+  .m { color:var(--muted); font-size:12px; margin-bottom:6px; }
+  .status { font-size:12px; margin-left:8px; }
+  .ok { color:var(--ok); } .err { color:var(--err); }
+  #msg { color:var(--muted); padding:8px 0; }
+</style>
+</head>
+<body>
+<form id="f">
+  <input id="q" placeholder="책 제목, 저자, ISBN 검색" autocomplete="off">
+  <button>검색</button>
+</form>
+<div id="msg"></div>
+<div id="list"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+$("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = $("q").value.trim();
+  if (!q) return;
+  $("list").innerHTML = "";
+  $("msg").textContent = "검색 중...";
+  try {
+    const r = await fetch("/api/search?q=" + encodeURIComponent(q));
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error);
+    if (!data.documents.length) { $("msg").textContent = "검색 결과가 없어요."; return; }
+    $("msg").textContent = "";
+    data.documents.forEach(render);
+  } catch (err) {
+    $("msg").textContent = "오류: " + err.message;
+  }
+});
+
+function render(book) {
+  const div = document.createElement("div");
+  div.className = "item";
+
+  const img = document.createElement("img");
+  if (book.thumbnail) img.src = book.thumbnail;
+
+  const info = document.createElement("div");
+  info.className = "info";
+
+  const t = document.createElement("div");
+  t.className = "t";
+  t.textContent = book.title;
+
+  const m = document.createElement("div");
+  m.className = "m";
+  m.textContent = [book.authors.join(", "), book.publisher, (book.datetime || "").slice(0, 4)]
+    .filter(Boolean).join(" · ");
+
+  const btn = document.createElement("button");
+  btn.textContent = "노션에 추가";
+  const st = document.createElement("span");
+  st.className = "status";
+
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    st.className = "status"; st.textContent = "추가 중...";
+    try {
+      // ISBN은 "10자리 13자리" 형태라서 13자리를 우선 사용
+      const parts = (book.isbn || "").split(" ").filter(Boolean);
+      const isbn = parts[1] || parts[0] || "";
+      const r = await fetch("/api/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...book, isbn }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      st.className = "status ok"; st.textContent = "✓ 추가됨";
+    } catch (err) {
+      btn.disabled = false;
+      st.className = "status err"; st.textContent = "실패: " + err.message;
+    }
+  });
+
+  info.append(t, m, btn, st);
+  div.append(img, info);
+  $("list").appendChild(div);
+}
+</script>
+</body>
+</html>
