@@ -2,11 +2,11 @@
 
 // ▼▼▼ 노션 DB의 속성 이름이 다르면 오른쪽 따옴표 안의 이름만 고치세요 ▼▼▼
 const PROP = {
-  title: "제목",       // 제목(Title) 속성
-  author: "저자",      // 텍스트
+  title: "이름",       // 제목(Title) 속성
+  author: "지은이",      // 텍스트
   publisher: "출판사", // 텍스트
   isbn: "ISBN",        // 텍스트
-  date: "출간일",      // 날짜
+  date: "출판 날짜",      // 날짜
   cover: "표지",       // 파일과 미디어
   summary: "소개",     // 텍스트
   link: "링크",        // URL
