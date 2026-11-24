@@ -15,10 +15,22 @@ const PROP = {
 
 const text = (s) => [{ text: { content: String(s || "").slice(0, 1900) } }];
 
+// 카카오 썸네일 주소에서 원본 이미지 주소를 꺼냄
+function cleanThumb(u) {
+  if (!u) return "";
+  try {
+    const f = new URL(u).searchParams.get("fname");
+    if (f) return f.replace(/^http:/, "https:");
+  } catch (e) {}
+  return u;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
   const b = req.body || {};
+  const img = cleanThumb(b.thumbnail);
+
   const props = {};
   props[PROP.title] = { title: text(b.title) };
   props[PROP.author] = { rich_text: text((b.authors || []).join(", ")) };
@@ -27,9 +39,9 @@ export default async function handler(req, res) {
   props[PROP.summary] = { rich_text: text(b.contents) };
   if (b.datetime) props[PROP.date] = { date: { start: b.datetime.slice(0, 10) } };
   if (b.url) props[PROP.link] = { url: b.url };
-  if (b.thumbnail) {
+  if (img) {
     props[PROP.cover] = {
-      files: [{ name: "cover.jpg", type: "external", external: { url: b.thumbnail } }],
+      files: [{ name: "cover.jpg", type: "external", external: { url: img } }],
     };
   }
 
@@ -37,7 +49,16 @@ export default async function handler(req, res) {
     parent: { database_id: process.env.NOTION_DB_ID },
     properties: props,
   };
-  if (b.thumbnail) body.cover = { type: "external", external: { url: b.thumbnail } };
+  if (img) {
+    body.cover = { type: "external", external: { url: img } };
+    body.children = [
+      {
+        object: "block",
+        type: "image",
+        image: { type: "external", external: { url: img } },
+      },
+    ];
+  }
 
   try {
     const r = await fetch("https://api.notion.com/v1/pages", {
